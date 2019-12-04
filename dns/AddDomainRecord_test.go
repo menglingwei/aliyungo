@@ -6,10 +6,9 @@ import (
 
 func TestAddDomainRecord(t *testing.T) {
 	client := NewTestClient()
-	rr := "*.ce4e2104fd10e4cd68ce21c40c28805e8.cn-beijing"
 
 	//describe
-	records,err := describeDomainRecords(t,client,rr)
+	records,err := describeDomainRecords(t,client,TestRR)
 	if err!=nil{
 		t.Fatalf("Error %++v",err )
 	}else{
@@ -17,8 +16,7 @@ func TestAddDomainRecord(t *testing.T) {
 	}
 
 	//add
-	//ip := "47.95.138.155"
-	//addDomainRecord(t,client,rr,ip)
+	//addDomainRecord(t,client,TestRR,TestIP)
 
 	//deleted
 	//for _,record := range records.DomainRecords.Record{

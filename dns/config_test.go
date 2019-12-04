@@ -7,6 +7,8 @@ var (
 	TestAccessKeyId     = os.Getenv("AccessKeyId")
 	TestAccessKeySecret = os.Getenv("AccessKeySecret")
 	TestDomainName      = os.Getenv("TopDomain")
+	TestRR = os.Getenv("RR")
+	TestIP = os.Getenv("IP")
 	TestDomainGroupName = "testgroup"
 	TestChanegGroupName = "testchangegroup"
 )
