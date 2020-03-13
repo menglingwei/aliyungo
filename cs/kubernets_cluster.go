@@ -9,9 +9,64 @@ import (
 	"github.com/denverdino/aliyungo/common"
 )
 
+type TaskState string
+
+const (
+	// task status
+	Task_Status_Running = "running"
+	Task_Status_Success = "Success"
+	Task_Status_Failed  = "Failed"
+
+	// upgrade state
+	UpgradeStep_NotStart    = "not_start"
+	UpgradeStep_Prechecking = "prechecking"
+	UpgradeStep_Upgrading   = "upgrading"
+	UpgradeStep_Pause       = "pause"
+	UpgradeStep_Success     = "success"
+)
+
 //modify cluster,include DeletionProtection and so on
 type ModifyClusterArgs struct {
 	DeletionProtection bool `json:"deletion_protection"`
+}
+
+type UpgradeClusterArgs struct {
+	Version string `json:"version"`
+}
+
+type UpgradeClusterResult struct {
+	Status           TaskState `json:"status"`
+	PrecheckReportId string    `json:"precheck_report_id"`
+	UpgradeStep      string    `json:"upgrade_step"`
+	ErrorMessage     string    `json:"error_message"`
+	*UpgradeTask     `json:"upgrade_task,omitempty"`
+}
+
+type UpgradeTask struct {
+	FieldRetries    int           `json:"retries,omitempty"`
+	FieldCreatedAt  time.Time     `json:"created_at"`
+	FieldMessage    string        `json:"message,omitempty"`
+	FieldStatus     string        `json:"status"` // empty|running|success|failed
+	FieldFinishedAt time.Time     `json:"finished_at,omitempty"`
+	UpgradeStatus   UpgradeStatus `json:"upgrade_status"`
+}
+
+type UpgradeStatus struct {
+	State      string  `json:"state"`
+	Phase      string  `json:"phase"` // {Master1, Master2, Master3, Nodes}
+	Total      int     `json:"total"`
+	Succeeded  int     `json:"succeeded"`
+	Failed     string  `json:"failed"`
+	Events     []Event `json:"events"`
+	IsCanceled bool    `json:"is_canceled"`
+}
+
+type Event struct {
+	Timestamp time.Time
+	Type      string
+	Reason    string
+	Message   string
+	Source    string
 }
 
 //modify cluster
@@ -19,12 +74,31 @@ func (client *Client) ModifyCluster(clusterId string, args *ModifyClusterArgs) e
 	return client.Invoke("", http.MethodPut, "/api/v2/clusters/"+clusterId, nil, args, nil)
 }
 
+//upgrade cluster
+func (client *Client) UpgradeCluster(clusterId string, args *UpgradeClusterArgs) error {
+	return client.Invoke("", http.MethodPost, fmt.Sprintf("/api/v2/clusters/%s/upgrade", clusterId), nil, args, nil)
+}
+
+//cancel upgrade cluster
+func (client *Client) CancelUpgradeCluster(clusterId string) error {
+	return client.Invoke("", http.MethodPost, fmt.Sprintf("/api/v2/clusters/%s/upgrade/cancel", clusterId), nil, nil, nil)
+}
+
+func (client *Client) QueryUpgradeClusterResult(clusterId string) (*UpgradeClusterResult, error) {
+	cluster := &UpgradeClusterResult{}
+	err := client.Invoke("", http.MethodGet, fmt.Sprintf("/api/v2/clusters/%s/upgrade/status", clusterId), nil, nil, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
 //Cluster Info
 type KubernetesClusterType string
 
 var (
-	DelicatedKubernetes = KubernetesClusterType("Kubernetes")
-	ManagedKubernetes   = KubernetesClusterType("ManagedKubernetes")
+	DelicatedKubernetes  = KubernetesClusterType("Kubernetes")
+	ManagedKubernetes    = KubernetesClusterType("ManagedKubernetes")
 	ServerlessKubernetes = KubernetesClusterType("Ask")
 )
 
@@ -64,7 +138,7 @@ type ClusterArgs struct {
 	NodePortRange string `json:"node_port_range"`
 
 	//ImageId
-	ImageId           string `json:"image_id"`
+	ImageId string `json:"image_id"`
 
 	PodVswitchIds []string `json:"pod_vswitch_ids"` // eni多网卡模式下，需要传额外的vswitchid给addon
 
@@ -131,7 +205,6 @@ type MasterArgs struct {
 	MasterSnapshotPolicyId string `json:"master_system_disk_snapshot_policy_id"`
 }
 
-
 type WorkerArgs struct {
 	WorkerVSwitchIds    []string `json:"worker_vswitch_ids"`
 	WorkerInstanceTypes []string `json:"worker_instance_types"`
@@ -144,6 +217,9 @@ type WorkerArgs struct {
 
 	WorkerAutoRenew       bool `json:"worker_auto_renew"`
 	WorkerAutoRenewPeriod int  `json:"worker_auto_renew_period"`
+
+	WorkerSystemDiskCategory string `json:"worker_system_disk_category"`
+	WorkerSystemDiskSize     int64  `json:"worker_system_disk_size"`
 
 	WorkerDataDisk  bool       `json:"worker_data_disk"`
 	WorkerDataDisks []DataDisk `json:"worker_data_disks"` //支持多个数据盘
@@ -178,9 +254,9 @@ type ScaleOutKubernetesClusterRequest struct {
 	WorkerDataDisk  bool       `json:"worker_data_disk"`
 	WorkerDataDisks []DataDisk `json:"worker_data_disks"` //支持多个数据盘
 
-	Tags   []Tag   `json:"tags"`
-	Taints []Taint `json:"taints"`
-	ImageId           string `json:"image_id"`
+	Tags    []Tag   `json:"tags"`
+	Taints  []Taint `json:"taints"`
+	ImageId string  `json:"image_id"`
 
 	UserData string `json:"user_data"`
 
@@ -273,7 +349,7 @@ func (client *Client) DeleteKubernetesClusterNodes(clusterId string, request *De
 	return response, nil
 }
 
-//Cluster defination
+//Cluster definition
 type KubernetesClusterDetail struct {
 	RegionId common.Region `json:"region_id"`
 

@@ -38,6 +38,13 @@ type DeleteStackRequest struct {
 	RegionId common.Region
 }
 
+type DeleteStackRpcRequest struct {
+	RegionId           common.Region
+	StackId            string
+	RetainResources    common.FlattenArray
+	RetainAllResources bool
+}
+
 type DeleteStackResponse struct {
 	common.Response
 }
@@ -203,10 +210,13 @@ func (client *Client) PreviewStack(regionId common.Region, args PreviewStackRequ
 
 //https://help.aliyun.com/document_detail/49066.html?spm=5176.doc28910.6.586.MJjWQh
 type UpdateStackRequest struct {
-	Template        string
-	Parameters      interface{}
-	DisableRollback bool
-	TimeoutMins     int
+	Template          string
+	Parameters        interface{}
+	DisableRollback   bool
+	TimeoutMins       int
+	StackPolicy       interface{}
+	UpdateAllowPolicy interface{}
+	Existing          bool
 }
 
 type UpdateStackResponse struct {
@@ -223,4 +233,14 @@ func (client *Client) UpdateStack(regionId common.Region, stackId string, stackN
 	}
 
 	return stack, nil
+}
+
+// rpc api: https://help.aliyun.com/document_detail/132113.html?spm=a2c4g.11174283.6.880.1b1d143eCzdE0b
+func (client *RpcClient) DeleteStack(args *DeleteStackRpcRequest) (*DeleteStackResponse, error) {
+	response := &DeleteStackResponse{}
+	err := client.InvokeByFlattenMethod("DeleteStack", args, response)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
